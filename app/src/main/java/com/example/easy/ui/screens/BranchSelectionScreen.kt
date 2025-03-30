@@ -1,5 +1,8 @@
 package com.example.easy.ui.screens
 
+import android.content.Context
+import android.util.Log
+import android.widget.Toast
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -8,13 +11,14 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.easy.data.model.Branch
 import com.example.easy.viewmodel.BranchViewModel
-import androidx.compose.ui.platform.LocalContext
 import com.example.easy.viewmodel.BranchViewModelFactory
+import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -24,9 +28,17 @@ fun BranchSelectionScreen(
         factory = BranchViewModelFactory(LocalContext.current)
     )
 ) {
+    val scope = rememberCoroutineScope()
+    val context = LocalContext.current
+    
     val branches by viewModel.branches.collectAsState()
     val isLoading by viewModel.isLoading.collectAsState()
     val error by viewModel.error.collectAsState()
+
+    // Add LaunchedEffect to fetch branches when screen is shown
+    LaunchedEffect(Unit) {
+        viewModel.fetchBranches()
+    }
 
     Scaffold(
         topBar = {
@@ -74,10 +86,14 @@ fun BranchSelectionScreen(
                         verticalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
                         items(branches) { branch ->
+                            // Inside BranchCard onClick
                             BranchCard(
                                 branch = branch,
                                 onClick = {
-                                    viewModel.saveBranchId(branch.id, branch.business_id)
+                                    val prefs = context.getSharedPreferences("auth_prefs", Context.MODE_PRIVATE)
+                                    prefs.edit()
+                                        .putInt("selected_branch_id", branch.id)
+                                        .apply()
                                     onBranchSelected(branch.id)
                                 }
                             )
@@ -120,3 +136,4 @@ private fun BranchCard(
         }
     }
 }
+

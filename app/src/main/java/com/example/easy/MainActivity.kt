@@ -15,6 +15,11 @@ import com.example.easy.ui.screens.OrderScreen
 import com.example.easy.ui.screens.BranchSelectionScreen
 import com.example.easy.ui.theme.EasyTheme
 
+// Add these imports at the top
+import androidx.navigation.compose.NavHost
+import androidx.navigation.compose.composable
+import androidx.navigation.compose.rememberNavController
+
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -48,8 +53,7 @@ class MainActivity : ComponentActivity() {
                     }
                     currentScreen == Screen.Order -> {
                         OrderScreen(
-                            onBackClick = { currentScreen = Screen.Home },
-                            onCartClick = { /* Implementar carrito */ }
+                            onBackClick = { currentScreen = Screen.Home }
                         )
                     }
                 }

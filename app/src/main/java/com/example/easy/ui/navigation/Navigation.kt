@@ -49,8 +49,7 @@ fun AppNavigation(
 
         composable(Screen.Order.name.lowercase()) {
             OrderScreen(
-                onBackClick = { navController.navigateUp() },
-                onCartClick = { /* Handle cart click */ }
+                onBackClick = { navController.navigateUp() }
             )
         }
     }

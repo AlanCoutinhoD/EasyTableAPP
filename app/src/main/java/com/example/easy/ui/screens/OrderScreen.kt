@@ -1,5 +1,6 @@
 package com.example.easy.ui.screens
 
+import android.content.Context
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -11,7 +12,7 @@ import androidx.compose.material.icons.filled.ShoppingCart
 import androidx.compose.material.icons.filled.Remove
 import androidx.compose.material.icons.materialIcon
 import androidx.compose.material.icons.materialPath
-import androidx.compose.material.icons.outlined.Remove  // Changed to outlined variant
+import androidx.compose.material.icons.outlined.Remove
 import androidx.compose.material.icons.rounded.Remove
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -32,23 +33,40 @@ import com.example.easy.data.model.Product
 // Add this import at the top with other imports
 import com.example.easy.data.model.CartItem
 
+import androidx.compose.material3.OutlinedTextField
+
+// Add to imports
+import com.example.easy.data.model.Branch
+import com.example.easy.data.model.Order
+import com.example.easy.data.model.OrderItem
+import com.example.easy.data.api.ApiClient
+import kotlinx.coroutines.launch
+import android.util.Log
+import android.widget.Toast
+import androidx.compose.runtime.collectAsState
+import kotlinx.coroutines.flow.StateFlow
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun OrderScreen(
     onBackClick: () -> Unit,
-    onCartClick: () -> Unit,
     menuViewModel: MenuViewModel = viewModel(
         factory = MenuViewModelFactory(LocalContext.current)
     )
 ) {
+    val scope = rememberCoroutineScope()
+    val context = LocalContext.current
     var showCart by remember { mutableStateOf(false) }
     var cartItems by remember { mutableStateOf(listOf<CartItem>()) }
     var selectedProduct by remember { mutableStateOf<Product?>(null) }
     var showQuantityDialog by remember { mutableStateOf(false) }
+    var tableNumber by remember { mutableStateOf("") } // Add this state
 
-    val menu by menuViewModel.menu.collectAsState()
-    val isLoading by menuViewModel.isLoading.collectAsState()
-    val error by menuViewModel.error.collectAsState()
+    // Fix the state collection
+    val menu = menuViewModel.menu.collectAsState().value
+    val isLoading = menuViewModel.isLoading.collectAsState().value
+    val error = menuViewModel.error.collectAsState().value
+    val selectedBranch = menuViewModel.selectedBranch.collectAsState().value
 
     LaunchedEffect(Unit) {
         menuViewModel.fetchMenu()
@@ -69,6 +87,17 @@ fun OrderScreen(
             }
         )
         
+        // Add table number input field
+        OutlinedTextField(
+            value = tableNumber,
+            onValueChange = { tableNumber = it },
+            label = { Text("Número de Mesa") },
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(16.dp),
+            singleLine = true
+        )
+        
         Box(
             modifier = Modifier.fillMaxSize()
         ) {
@@ -79,8 +108,9 @@ fun OrderScreen(
                     )
                 }
                 error != null -> {
+                    // Fix the Elvis operator warning
                     Text(
-                        text = error ?: "",
+                        text = error.toString(),
                         color = MaterialTheme.colorScheme.error,
                         modifier = Modifier
                             .align(Alignment.Center)
@@ -120,6 +150,101 @@ fun OrderScreen(
         }
     }
 
+    // Add this block to show the cart dialog
+    // Replace the entire cart dialog implementation
+    if (showCart) {
+        AlertDialog(
+            onDismissRequest = { showCart = false },
+            title = { Text("Carrito") },
+            text = {
+                if (cartItems.isEmpty()) {
+                    Text("El carrito está vacío")
+                } else {
+                    LazyColumn {
+                        items(cartItems) { item ->
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(vertical = 8.dp),
+                                horizontalArrangement = Arrangement.SpaceBetween
+                            ) {
+                                Column {
+                                    Text(
+                                        text = item.name,
+                                        style = MaterialTheme.typography.bodyLarge
+                                    )
+                                    Text(
+                                        text = "Cantidad: ${item.quantity}",
+                                        style = MaterialTheme.typography.bodyMedium
+                                    )
+                                }
+                                Text(
+                                    text = "$${item.price}",
+                                    style = MaterialTheme.typography.bodyLarge
+                                )
+                            }
+                            Divider()
+                        }
+                    }
+                }
+            },
+            confirmButton = {
+                // Inside the confirmButton onClick
+                Button(
+                    onClick = {
+                        val prefs = context.getSharedPreferences("auth_prefs", Context.MODE_PRIVATE)
+                        val branchId = prefs.getInt("selected_branch_id", -1)
+                        
+                        if (branchId == -1) {
+                            Toast.makeText(context, "Por favor seleccione una sucursal", Toast.LENGTH_SHORT).show()
+                            return@Button
+                        }
+                        
+                        val order = Order(
+                            total_amount = cartItems.sumOf { it.price.toDoubleOrNull()?.times(it.quantity) ?: 0.0 },
+                            payment_method = "cash",
+                            branch_id = branchId,  // Using the stored branch ID
+                            tableNumber = tableNumber,
+                            items = cartItems.map { item ->
+                                OrderItem(
+                                    product_id = item.id,
+                                    quantity = item.quantity,
+                                    price = item.price.toDoubleOrNull() ?: 0.0
+                                )
+                            }
+                        )
+                        
+                        scope.launch {
+                            try {
+                                val response = ApiClient.orderService.createOrder(order)
+                                if (response.isSuccessful) {
+                                    Log.d("OrderScreen", "Order created successfully: ${response.body()}")
+                                    Toast.makeText(context, "Orden creada exitosamente", Toast.LENGTH_SHORT).show()
+                                    showCart = false
+                                    cartItems = emptyList()
+                                } else {
+                                    Log.e("OrderScreen", "Error creating order: ${response.errorBody()?.string()}")
+                                    Toast.makeText(context, "Error al crear la orden", Toast.LENGTH_SHORT).show()
+                                }
+                            } catch (e: Exception) {
+                                Log.e("OrderScreen", "Exception creating order", e)
+                                Toast.makeText(context, "Error: ${e.message}", Toast.LENGTH_SHORT).show()
+                            }
+                        }
+                    },
+                    enabled = cartItems.isNotEmpty() && tableNumber.isNotEmpty()
+                ) {
+                    Text("Confirmar Orden")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showCart = false }) {
+                    Text("Cerrar")
+                }
+            }
+        )
+    }
+
     if (showQuantityDialog && selectedProduct != null) {
         AddToCartDialog(
             product = selectedProduct!!,
@@ -142,7 +267,7 @@ fun OrderScreen(
 }
 
 @Composable
-private fun MenuItemCard(
+fun MenuItemCard(
     title: String,
     description: String,
     price: String,
@@ -272,5 +397,3 @@ private fun AddToCartDialog(
         }
     )
 }
-
-// Remove the CartItem data class declaration at the bottom of the file
