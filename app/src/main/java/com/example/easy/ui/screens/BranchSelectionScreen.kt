@@ -77,7 +77,7 @@ fun BranchSelectionScreen(
                             BranchCard(
                                 branch = branch,
                                 onClick = {
-                                    viewModel.saveBranchId(branch.id)
+                                    viewModel.saveBranchId(branch.id, branch.business_id)
                                     onBranchSelected(branch.id)
                                 }
                             )

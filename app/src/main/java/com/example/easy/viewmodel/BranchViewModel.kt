@@ -60,10 +60,11 @@ class BranchViewModel(private val context: Context) : ViewModel() {
         }
     }
 
-    fun saveBranchId(branchId: Int) {
+    fun saveBranchId(branchId: Int, businessId: Int) {
         context.getSharedPreferences("auth_prefs", Context.MODE_PRIVATE)
             .edit()
             .putInt("selected_branch_id", branchId)
+            .putInt("business_id", businessId)
             .apply()
     }
 }

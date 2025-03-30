@@ -1,55 +1,53 @@
 package com.example.easy.ui.navigation
 
-import androidx.compose.runtime.Composable
+import androidx.compose.runtime.*
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.lifecycle.viewmodel.compose.viewModel
-import com.example.easy.ui.screens.BranchSelectionScreen
-import com.example.easy.ui.screens.LoginScreen  // Add this import
-import com.example.easy.ui.screens.MainMenuScreen
-import com.example.easy.ui.screens.OrderScreen
+import com.example.easy.ui.screens.*
 import com.example.easy.viewmodel.BranchViewModel
+
+enum class Screen {
+    Login,
+    BranchSelection,
+    Menu,
+    Order
+}
 
 @Composable
 fun AppNavigation(
     navController: NavHostController,
     branchViewModel: BranchViewModel = viewModel()
 ) {
-    NavHost(navController, startDestination = "login") {
-        composable("login") {
+    var currentScreen by remember { mutableStateOf<Screen>(Screen.Login) }
+
+    NavHost(navController, startDestination = Screen.Login.name.lowercase()) {
+        composable(Screen.Login.name.lowercase()) {
             LoginScreen(
                 onLoginSuccess = {
-                    navController.navigate("branch_selection") {
-                        popUpTo("login") { inclusive = true }
+                    navController.navigate(Screen.BranchSelection.name.lowercase()) {
+                        popUpTo(Screen.Login.name.lowercase()) { inclusive = true }
                     }
                 }
             )
         }
 
-        composable("branch_selection") {
+        composable(Screen.BranchSelection.name.lowercase()) {
             BranchSelectionScreen(
                 onBranchSelected = { branchId ->
-                    branchViewModel.saveBranchId(branchId)
-                    navController.navigate("main_menu") {
-                        popUpTo("branch_selection") { inclusive = true }
+                    navController.navigate(Screen.Menu.name.lowercase()) {
+                        popUpTo(Screen.BranchSelection.name.lowercase()) { inclusive = true }
                     }
                 }
             )
         }
 
-        composable("main_menu") {
-            MainMenuScreen(
-                onCreateOrderClick = {
-                    navController.navigate("order")
-                },
-                onViewOrdersClick = {
-                    navController.navigate("orders")
-                }
-            )
+        composable(Screen.Menu.name.lowercase()) {
+            MenuScreen()
         }
 
-        composable("order") {
+        composable(Screen.Order.name.lowercase()) {
             OrderScreen(
                 onBackClick = { navController.navigateUp() },
                 onCartClick = { /* Handle cart click */ }

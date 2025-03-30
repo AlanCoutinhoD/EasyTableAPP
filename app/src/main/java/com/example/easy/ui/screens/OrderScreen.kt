@@ -8,6 +8,11 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.ShoppingCart
+import androidx.compose.material.icons.filled.Remove
+import androidx.compose.material.icons.materialIcon
+import androidx.compose.material.icons.materialPath
+import androidx.compose.material.icons.outlined.Remove  // Changed to outlined variant
+import androidx.compose.material.icons.rounded.Remove
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -16,25 +21,37 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import com.example.easy.ui.theme.*
+import androidx.lifecycle.viewmodel.compose.viewModel
+import com.example.easy.viewmodel.MenuViewModel
+import com.example.easy.viewmodel.MenuViewModelFactory
+import androidx.compose.ui.platform.LocalContext
+import coil.compose.AsyncImage
+import androidx.compose.ui.layout.ContentScale
+import com.example.easy.data.model.Product
+
+// Add this import at the top with other imports
+import com.example.easy.data.model.CartItem
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun OrderScreen(
     onBackClick: () -> Unit,
-    onCartClick: () -> Unit
+    onCartClick: () -> Unit,
+    menuViewModel: MenuViewModel = viewModel(
+        factory = MenuViewModelFactory(LocalContext.current)
+    )
 ) {
     var showCart by remember { mutableStateOf(false) }
     var cartItems by remember { mutableStateOf(listOf<CartItem>()) }
-    var selectedMenuItem by remember { mutableStateOf<MenuItem?>(null) }
+    var selectedProduct by remember { mutableStateOf<Product?>(null) }
     var showQuantityDialog by remember { mutableStateOf(false) }
 
-    val menuItems = remember {
-        listOf(
-            MenuItem(0, "Pasta Carbonara", "Pasta con salsa cremosa de huevo, queso parmesano, panceta y...", 15.99, Tag.POPULAR),
-            MenuItem(1, "Filete de Salmón", "Filete de salmón a la parrilla con salsa de limón y hierbas,...", 22.50, Tag.SIN_GLUTEN),
-            MenuItem(2, "Risotto de Champiñones", "Arroz cremoso cocinado lentamente con champiñones,...", 18.75, Tag.VEGETARIANO),
-            MenuItem(3, "Ensalada César", "Lechuga romana, crutones, queso parmesano y aderezo César...", 12.25, Tag.VEGETARIANO)
-        )
+    val menu by menuViewModel.menu.collectAsState()
+    val isLoading by menuViewModel.isLoading.collectAsState()
+    val error by menuViewModel.error.collectAsState()
+
+    LaunchedEffect(Unit) {
+        menuViewModel.fetchMenu()
     }
 
     Column {
@@ -52,79 +69,84 @@ fun OrderScreen(
             }
         )
         
-        LazyColumn(
+        Box(
             modifier = Modifier.fillMaxSize()
         ) {
-            items(menuItems) { menuItem ->
-                MenuItemCard(
-                    title = menuItem.name,
-                    description = menuItem.description,
-                    price = "$${menuItem.price}",
-                    tag = menuItem.tag,
-                    onClick = {
-                        selectedMenuItem = menuItem
-                        showQuantityDialog = true
+            when {
+                isLoading -> {
+                    CircularProgressIndicator(
+                        modifier = Modifier.align(Alignment.Center)
+                    )
+                }
+                error != null -> {
+                    Text(
+                        text = error ?: "",
+                        color = MaterialTheme.colorScheme.error,
+                        modifier = Modifier
+                            .align(Alignment.Center)
+                            .padding(16.dp)
+                    )
+                }
+                menu.isEmpty() -> {
+                    Text(
+                        text = "No hay productos disponibles",
+                        modifier = Modifier
+                            .align(Alignment.Center)
+                            .padding(16.dp)
+                    )
+                }
+                else -> {
+                    LazyColumn(
+                        modifier = Modifier.fillMaxSize(),
+                        contentPadding = PaddingValues(16.dp)
+                    ) {
+                        menu.forEach { menuResponse ->
+                            items(menuResponse.products) { product ->
+                                MenuItemCard(
+                                    title = product.name,
+                                    description = product.description,
+                                    price = "$ ${product.price}",
+                                    imageUrl = product.image_url,
+                                    onClick = {
+                                        selectedProduct = product
+                                        showQuantityDialog = true
+                                    }
+                                )
+                            }
+                        }
                     }
-                )
+                }
             }
         }
     }
 
-    if (showQuantityDialog && selectedMenuItem != null) {
+    if (showQuantityDialog && selectedProduct != null) {
         AddToCartDialog(
-            menuItem = selectedMenuItem!!,
+            product = selectedProduct!!,
             onDismiss = { 
                 showQuantityDialog = false
-                selectedMenuItem = null
+                selectedProduct = null
             },
             onConfirm = { quantity ->
                 cartItems = cartItems + CartItem(
-                    id = selectedMenuItem!!.id,
-                    name = selectedMenuItem!!.name,
-                    price = selectedMenuItem!!.price,
+                    id = selectedProduct!!.id,
+                    name = selectedProduct!!.name,
+                    price = selectedProduct!!.price,
                     quantity = quantity
                 )
                 showQuantityDialog = false
-                selectedMenuItem = null
-            }
-        )
-    }
-
-    if (showCart) {
-        CartDialog(
-            onDismiss = { showCart = false },
-            cartItems = cartItems,
-            onClearCart = { cartItems = emptyList() },
-            onUpdateQuantity = { item, newQuantity ->
-                cartItems = cartItems.map {
-                    if (it.id == item.id) it.copy(quantity = newQuantity)
-                    else it
-                }
-            },
-            onRemoveItem = { item ->
-                cartItems = cartItems.filter { it.id != item.id }
-            },
-            onFinishOrder = {
-                showCart = false
+                selectedProduct = null
             }
         )
     }
 }
-
-data class MenuItem(
-    val id: Int,
-    val name: String,
-    val description: String,
-    val price: Double,
-    val tag: Tag
-)
 
 @Composable
 private fun MenuItemCard(
     title: String,
     description: String,
     price: String,
-    tag: Tag? = null,
+    imageUrl: String,
     onClick: () -> Unit
 ) {
     Card(
@@ -134,37 +156,43 @@ private fun MenuItemCard(
             .clickable(onClick = onClick),
         elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
     ) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(16.dp),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.Top
-        ) {
-            Column(
-                modifier = Modifier.weight(1f)
+        Column {
+            AsyncImage(
+                model = imageUrl,
+                contentDescription = title,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(200.dp),
+                contentScale = ContentScale.Crop
+            )
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(16.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.Top
             ) {
+                Column(
+                    modifier = Modifier.weight(1f)
+                ) {
+                    Text(
+                        text = title,
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold
+                    )
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Text(
+                        text = description,
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = TextSecondary
+                    )
+                }
                 Text(
-                    text = title,
+                    text = price,
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.Bold
                 )
-                Spacer(modifier = Modifier.height(4.dp))
-                Text(
-                    text = description,
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = TextSecondary
-                )
-                Spacer(modifier = Modifier.height(8.dp))
-                tag?.let { 
-                    TagChip(tag)
-                }
             }
-            Text(
-                text = price,
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.Bold
-            )
         }
     }
 }
@@ -200,62 +228,49 @@ enum class Tag(val text: String) {
 
 @Composable
 private fun AddToCartDialog(
-    menuItem: MenuItem,
+    product: Product,  // Changed from MenuItem to Product
     onDismiss: () -> Unit,
     onConfirm: (Int) -> Unit
 ) {
     var quantity by remember { mutableStateOf(1) }
 
-    Dialog(onDismissRequest = onDismiss) {
-        Surface(
-            shape = MaterialTheme.shapes.medium,
-            color = MaterialTheme.colorScheme.surface
-        ) {
-            Column(
-                modifier = Modifier.padding(16.dp),
-                horizontalAlignment = Alignment.CenterHorizontally
-            ) {
-                Text(
-                    text = menuItem.name,
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.Bold
-                )
-                Spacer(modifier = Modifier.height(16.dp))
-                
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.Center
-                ) {
-                    IconButton(
-                        onClick = { if (quantity > 1) quantity-- },
-                        enabled = quantity > 1
-                    ) {
-                        Text("-", style = MaterialTheme.typography.titleMedium)
-                    }
-                    Text(
-                        text = "$quantity",
-                        modifier = Modifier.padding(horizontal = 16.dp),
-                        style = MaterialTheme.typography.titleMedium
-                    )
-                    IconButton(onClick = { quantity++ }) {
-                        Icon(Icons.Default.Add, "Aumentar cantidad")
-                    }
-                }
-                
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Agregar al carrito") },
+        text = {
+            Column {
+                Text("${product.name} - $${product.price}")
                 Spacer(modifier = Modifier.height(16.dp))
                 Row(
                     modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.End
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
-                    TextButton(onClick = onDismiss) {
-                        Text("Cancelar")
+                    IconButton(
+                        onClick = { if (quantity > 1) quantity-- }
+                    ) {
+                        Icon(Icons.Rounded.Remove, "Decrease")  // Changed to Rounded variant
                     }
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Button(onClick = { onConfirm(quantity) }) {
-                        Text("Añadir")
+                    Text(quantity.toString())
+                    IconButton(
+                        onClick = { quantity++ }
+                    ) {
+                        Icon(Icons.Default.Add, "Increase")
                     }
                 }
             }
+        },
+        confirmButton = {
+            Button(onClick = { onConfirm(quantity) }) {
+                Text("Agregar")
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text("Cancelar")
+            }
         }
-    }
+    )
 }
+
+// Remove the CartItem data class declaration at the bottom of the file
