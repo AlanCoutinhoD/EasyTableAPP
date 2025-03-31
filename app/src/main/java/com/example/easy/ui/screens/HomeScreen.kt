@@ -10,12 +10,15 @@ import androidx.compose.ui.unit.dp
 import com.example.easy.ui.theme.PrimaryBlack
 import com.example.easy.ui.theme.TextPrimary
 import com.example.easy.ui.theme.TextSecondary
+import androidx.navigation.NavController
+import androidx.navigation.compose.rememberNavController
 
 @Composable
 fun HomeScreen(
+    navController: NavController, // Add NavController parameter
     onLogout: () -> Unit,
     onCreateOrder: () -> Unit,
-    onViewOrders: () -> Unit
+    onViewOrders: () -> Unit // Add onViewOrders parameter
 ) {
     Column(
         modifier = Modifier
@@ -56,7 +59,7 @@ fun HomeScreen(
         Spacer(modifier = Modifier.height(16.dp))
 
         Button(
-            onClick = onViewOrders,
+            onClick = onViewOrders, // Use onViewOrders lambda
             modifier = Modifier
                 .fillMaxWidth()
                 .height(48.dp),

@@ -13,6 +13,7 @@ import com.example.easy.ui.screens.LoginScreen
 import com.example.easy.ui.screens.HomeScreen
 import com.example.easy.ui.screens.OrderScreen
 import com.example.easy.ui.screens.BranchSelectionScreen
+import com.example.easy.ui.screens.ViewOrdersScreen // Add this import
 import com.example.easy.ui.theme.EasyTheme
 
 // Add these imports at the top
@@ -24,38 +25,29 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContent {
-            var isLoggedIn by remember { mutableStateOf(false) }
-            var hasBranchSelected by remember { mutableStateOf(false) }
-            var currentScreen by remember { mutableStateOf<Screen>(Screen.Home) }
-            
-            EasyTheme {
-                when {
-                    !isLoggedIn -> {
-                        LoginScreen(onLoginSuccess = { isLoggedIn = true })
-                    }
-                    !hasBranchSelected -> {
-                        BranchSelectionScreen(
-                            onBranchSelected = { branchId: Int ->
-                                hasBranchSelected = true
-                                currentScreen = Screen.Home
-                            }
-                        )
-                    }
-                    currentScreen == Screen.Home -> {
-                        HomeScreen(
-                            onLogout = { 
-                                isLoggedIn = false
-                                hasBranchSelected = false 
-                            },
-                            onCreateOrder = { currentScreen = Screen.Order },
-                            onViewOrders = { /* Implementar navegación a ver órdenes */ }
-                        )
-                    }
-                    currentScreen == Screen.Order -> {
-                        OrderScreen(
-                            onBackClick = { currentScreen = Screen.Home }
-                        )
-                    }
+            val navController = rememberNavController() // Initialize NavController
+
+            NavHost(navController = navController, startDestination = "loginScreen") {
+                composable("loginScreen") {
+                    LoginScreen(
+                        onLoginSuccess = { navController.navigate("homeScreen") }
+                    )
+                }
+                composable("homeScreen") {
+                    HomeScreen(
+                        navController = navController,
+                        onLogout = { navController.navigate("loginScreen") },
+                        onCreateOrder = { navController.navigate("orderScreen") },
+                        onViewOrders = { navController.navigate("viewOrdersScreen") } // Ensure this navigates to viewOrdersScreen
+                    )
+                }
+                composable("orderScreen") {
+                    OrderScreen(
+                        onBackClick = { navController.navigate("homeScreen") }
+                    )
+                }
+                composable("viewOrdersScreen") { // Ensure this route is defined
+                    ViewOrdersScreen()
                 }
             }
         }
