@@ -21,16 +21,27 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 
+import android.content.Context
+
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContent {
             val navController = rememberNavController() // Initialize NavController
 
+            // Retrieve values from shared preferences
+            val prefs = getSharedPreferences("auth_prefs", Context.MODE_PRIVATE)
+            val branchId = prefs.getInt("selected_branch_id", -1) // Default to -1 if not found
+            val token = prefs.getString("token", "") ?: "" // Default to empty string if not found
+
             NavHost(navController = navController, startDestination = "loginScreen") {
                 composable("loginScreen") {
                     LoginScreen(
-                        onLoginSuccess = { navController.navigate("homeScreen") }
+                        onLoginSuccess = {
+                            // Save token in shared preferences
+                            prefs.edit().putString("token", "your_bearer_token_here").apply()
+                            navController.navigate("homeScreen")
+                        }
                     )
                 }
                 composable("homeScreen") {
@@ -38,7 +49,7 @@ class MainActivity : ComponentActivity() {
                         navController = navController,
                         onLogout = { navController.navigate("loginScreen") },
                         onCreateOrder = { navController.navigate("orderScreen") },
-                        onViewOrders = { navController.navigate("viewOrdersScreen") } // Ensure this navigates to viewOrdersScreen
+                        onViewOrders = { navController.navigate("viewOrdersScreen") }
                     )
                 }
                 composable("orderScreen") {
@@ -46,8 +57,8 @@ class MainActivity : ComponentActivity() {
                         onBackClick = { navController.navigate("homeScreen") }
                     )
                 }
-                composable("viewOrdersScreen") { // Ensure this route is defined
-                    ViewOrdersScreen()
+                composable("viewOrdersScreen") {
+                    ViewOrdersScreen(branchId = branchId, token = token) // Pass branchId and token
                 }
             }
         }
