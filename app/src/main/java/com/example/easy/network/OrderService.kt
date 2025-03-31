@@ -30,7 +30,7 @@ data class OrderResponse(
 )
 
 interface OrderService {
-    @GET("api/orders/branch/{branchid}/prepared")
+    @GET("api/public/orders/branch/{branchid}/prepared")
     suspend fun getPreparedOrders(
         @Path("branchid") branchId: Int,
         @Header("Authorization") token: String
